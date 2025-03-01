@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 The Android Open Source Project
+ * Copyright 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <android/binder_manager.h>
-#include <android/binder_process.h>
-#include <fuzzbinder/libbinder_ndk_driver.h>
-#include <fuzzer/FuzzedDataProvider.h>
 
-#include "Nfc.h"
+#ifndef CONFIG_H_
+#define CONFIG_H_
 
-using ::aidl::android::hardware::nfc::Nfc;
-using android::fuzzService;
-using ndk::SharedRefBase;
+extern "C" int GetNumValue(const char* name, void* pValue, unsigned long len);
+extern "C" int GetStrValue(const char* name, char* pValue, unsigned long l);
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  std::shared_ptr<Nfc> nfc_service = ndk::SharedRefBase::make<Nfc>();
-  fuzzService(nfc_service->asBinder().get(), FuzzedDataProvider(data, size));
-  return 0;
-}
+#endif  // CONFIG_H_

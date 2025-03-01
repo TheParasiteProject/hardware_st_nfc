@@ -20,13 +20,17 @@
  *
  *
  ******************************************************************************/
+#include "config.h"
+
 #include <android-base/properties.h>
 #include <log/log.h>
 #include <stdio.h>
 #include <sys/stat.h>
+
 #include <list>
 #include <string>
 #include <vector>
+
 #include "android_logmsg.h"
 const char alternative_config_path[] = "";
 const char* transport_config_paths[] = {"/odm/etc/", "/vendor/etc/", "/etc/"};
@@ -268,7 +272,7 @@ bool CNfcConfig::readConfig(const char* name, bool bResetContent) {
           state = END_LINE;
           break;
         }
-        [[fallthrough]]; // fall through to numValue to handle numValue
+        [[fallthrough]];  // fall through to numValue to handle numValue
 
       case NUM_VALUE:
         if (isDigit(c, base)) {
