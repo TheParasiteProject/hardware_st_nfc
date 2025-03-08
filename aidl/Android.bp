@@ -72,3 +72,44 @@ cc_fuzz {
     ],
     vendor: true,
 }
+
+prebuilt_etc {
+    name: "nfc-service-default.xml",
+    src: "nfc-service-default.xml",
+    sub_dir: "vintf",
+    installable: false,
+}
+
+genrule {
+    name: "com.google.android.hardware.nfc.st.rc-gen",
+    srcs: ["nfc-service-default.rc"],
+    out: ["com.google.android.hardware.nfc.st.rc"],
+    cmd: "sed -E 's@/vendor/bin@/apex/com.google.android.hardware.nfc.st/bin@' $(in) > $(out)",
+}
+
+prebuilt_etc {
+    name: "com.google.android.hardware.nfc.st.rc",
+    src: ":com.google.android.hardware.nfc.st.rc-gen",
+    installable: false,
+}
+
+apex {
+    name: "com.google.android.hardware.nfc.st",
+    manifest: "apex_manifest.json",
+    file_contexts: "file_contexts",
+    key: "com.android.hardware.key",
+    certificate: ":com.android.hardware.certificate",
+    updatable: false,
+    vendor: true,
+
+    binaries: ["android.hardware.nfc-service.st"],
+    prebuilts: [
+        "com.google.android.hardware.nfc.st.rc",
+        "nfc-service-default.xml",
+        "android.hardware.nfc.prebuilt.xml",
+        "android.hardware.nfc.hce.prebuilt.xml",
+        "android.hardware.nfc.hcef.prebuilt.xml",
+        "com.nxp.mifare.prebuilt.xml",
+        "android.hardware.nfc.ese.prebuilt.xml",
+    ],
+}
