@@ -39,6 +39,13 @@
 #endif
 #define VENDOR_LIB_EXT ".so"
 
+
+#define CRC_PRESET_A 0x6363
+#define CRC_PRESET_B 0xFFFF
+#define Type_A 0
+#define Type_B 1
+
+
 bool dbg_logging = false;
 
 extern void HalCoreCallback(void* context, uint32_t event, const void* d,
@@ -54,6 +61,7 @@ uint8_t hal_is_closed = 1;
 pthread_mutex_t hal_mtx = PTHREAD_MUTEX_INITIALIZER;
 st21nfc_dev_t dev;
 int nfc_mode = 0;
+uint8_t nci_cmd[256];
 
 /*
  * NCI HAL method implementations. These must be overridden
@@ -317,6 +325,7 @@ int StNfc_hal_write(uint16_t data_len, const uint8_t* p_data) {
   uint8_t NCI_ANDROID_PASSIVE_OBSERVER_PER_TECH_PREFIX[] = {0x2f, 0x0c, 0x02,
                                                             0x05};
   uint8_t NCI_QUERY_ANDROID_PASSIVE_OBSERVER_PREFIX[] = {0x2f, 0x0c, 0x01, 0x4};
+  uint8_t NCI_ANDROID_PREFIX[] = {0x2f, 0x0c};
   uint8_t RF_GET_LISTEN_OBSERVE_MODE_STATE[5] = {0x21, 0x17, 0x00};
   uint8_t RF_SET_LISTEN_OBSERVE_MODE_STATE[4] = {0x21, 0x16, 0x01, 0x0};
   uint8_t CORE_GET_CONFIG_OBSERVER[5] = {0x20, 0x03, 0x02, 0x01, 0xa3};
@@ -386,6 +395,101 @@ int StNfc_hal_write(uint16_t data_len, const uint8_t* p_data) {
     mSetObserve[3] = mTechObserved;
     hal_wrapper_set_observer_mode(mTechObserved, true);
     if (!HalSendDownstream(dev.hHAL, mSetObserve, mSetObserve_size)) {
+      STLOG_HAL_E("HAL st21nfc %s  SendDownstream failed", __func__);
+      (void)pthread_mutex_unlock(&hal_mtx);
+      return 0;
+    }
+  } else if (!memcmp(p_data, NCI_ANDROID_PREFIX, sizeof(NCI_ANDROID_PREFIX)) &&
+             p_data[3] == 0x6) {
+    DispHal("TX DATA", (p_data), data_len);
+
+    memcpy(nci_cmd+3, p_data+4, 4);
+    nci_cmd[0] = 0x2f;
+    nci_cmd[1] = 0x19;
+
+    int index = 8;
+    int ll_index = 7;
+    uint8_t nci_length = 0;
+    uint16_t crc = 0;
+    bool prefix_match = false;
+    bool exact_match = true;
+
+    while (index < data_len) {
+      // Read the Type field (1 byte)
+      uint8_t type_field = p_data[index];
+      int tlv_len = p_data[index + 1];
+      prefix_match = false;
+      exact_match = true;
+      if (p_data[index] == 0x01) {
+        crc = iso14443_crc(p_data + index + 3, (uint8_t)((tlv_len - 1) / 2),
+                           Type_B);
+      } else if ((p_data[index] & 0xF0) == 0x00) {
+        crc = iso14443_crc(p_data + index + 3, (uint8_t)((tlv_len - 1) / 2),
+                           Type_A);
+      } else {
+        prefix_match = true;
+      }
+
+      nci_cmd[ll_index++] = p_data[index++];
+      nci_cmd[ll_index++] =
+          (!prefix_match) ? p_data[index++] + 4 : p_data[index++];
+      nci_cmd[ll_index++] = p_data[index++];
+
+      memcpy(nci_cmd + ll_index, p_data + index, (uint8_t)((tlv_len - 1) / 2));
+      ll_index += (tlv_len - 1) / 2;
+      index += (tlv_len - 1) / 2;
+      int crc_index = 0;
+      if (!prefix_match) {
+        crc_index = ll_index;
+        nci_cmd[ll_index++] = (uint8_t)crc;
+        nci_cmd[ll_index++] = (uint8_t)(crc >> 8);
+      }
+
+      memcpy(nci_cmd + ll_index, p_data + index, (tlv_len - 1) / 2);
+      for (int i = 0; i < (tlv_len - 1) / 2; ++i) {
+        if (p_data[index + i] != 0xFF) {
+            exact_match = false;
+            break;
+        }
+      }
+      ll_index += (tlv_len - 1) / 2;
+      index += (tlv_len - 1) / 2;
+      uint8_t crc_mask = exact_match ? 0xFF : 0x00;
+      if (!prefix_match) {
+        nci_cmd[ll_index++] = crc_mask;
+        nci_cmd[ll_index++] = crc_mask;
+
+        if (!exact_match) {
+        nci_cmd[crc_index] = crc_mask;
+        nci_cmd[crc_index +1] = crc_mask;
+        }
+
+      }
+    }
+    nci_length = ll_index;
+    nci_cmd[2] = ll_index -3;
+
+    if (!HalSendDownstream(dev.hHAL, nci_cmd, nci_length)) {
+      STLOG_HAL_E("HAL st21nfc %s  SendDownstream failed", __func__);
+      (void)pthread_mutex_unlock(&hal_mtx);
+      return 0;
+    }
+  } else if (!memcmp(p_data, NCI_ANDROID_PREFIX, sizeof(NCI_ANDROID_PREFIX)) &&
+             p_data[3] == 0x9) {
+    DispHal("TX DATA", (p_data), data_len);
+    memcpy(nci_cmd + 3, p_data + 4, data_len - 4);
+
+    uint16_t crc = iso14443_crc(nci_cmd + 7, nci_cmd[5] - 1, Type_A);
+
+    uint8_t len = p_data[2];
+    nci_cmd[0] = 0x2f;
+    nci_cmd[1] = 0x1d;
+    nci_cmd[5] = nci_cmd[5] + 2;
+    nci_cmd[data_len - 1] = (uint8_t)crc;
+    nci_cmd[data_len] = (uint8_t)(crc >> 8);
+
+    nci_cmd[2] = p_data[2] + 1;
+    if (!HalSendDownstream(dev.hHAL, nci_cmd, nci_cmd[2] + 3)) {
       STLOG_HAL_E("HAL st21nfc %s  SendDownstream failed", __func__);
       (void)pthread_mutex_unlock(&hal_mtx);
       return 0;
@@ -613,3 +717,22 @@ void StNfc_hal_setLogging(bool enable) {
 bool StNfc_hal_isLoggingEnabled() { return dbg_logging; }
 
 void StNfc_hal_dump(int fd) { hal_wrapper_dumplog(fd); }
+
+uint16_t iso14443_crc(const uint8_t* data, size_t szLen, int type) {
+  uint16_t tempCrc;
+  if (type == Type_A) {
+    tempCrc = (unsigned short)CRC_PRESET_A;
+  } else {
+    tempCrc = (unsigned short)CRC_PRESET_B;
+  }
+  do {
+    uint8_t bt;
+    bt = *data++;
+    bt = (bt ^ (uint8_t)(tempCrc & 0x00FF));
+    bt = (bt ^ (bt << 4));
+    tempCrc = (tempCrc >> 8) ^ ((uint32_t)bt << 8) ^ ((uint32_t)bt << 3) ^
+              ((uint32_t)bt >> 4);
+  } while (--szLen);
+
+  return tempCrc;
+}
