@@ -480,19 +480,23 @@ int StNfc_hal_write(uint16_t data_len, const uint8_t* p_data) {
       return 0;
     }
     memcpy(nci_cmd + 3, p_data + 4, data_len - 4);
-
-    uint16_t crc = 0;
-    if (nci_cmd[5] > 0) {
-      crc = iso14443_crc(nci_cmd + 7, nci_cmd[5] - 1, Type_A);
-    }
-    uint8_t len = p_data[2];
     nci_cmd[0] = 0x2f;
     nci_cmd[1] = 0x1d;
-    nci_cmd[5] = nci_cmd[5] + 2;
-    nci_cmd[data_len - 1] = (uint8_t)crc;
-    nci_cmd[data_len] = (uint8_t)(crc >> 8);
+    if (p_data[2] == 0x2 && p_data[4] == 0x0) {
+      nci_cmd[2] = 0x1;
+    } else {
+      uint16_t crc = 0;
+      if (nci_cmd[5] > 0) {
+        crc = iso14443_crc(nci_cmd + 7, nci_cmd[5] - 1, Type_A);
+      }
 
-    nci_cmd[2] = p_data[2] + 1;
+      uint8_t len = p_data[2];
+      nci_cmd[5] = nci_cmd[5] + 2;
+      nci_cmd[data_len - 1] = (uint8_t)crc;
+      nci_cmd[data_len] = (uint8_t)(crc >> 8);
+
+      nci_cmd[2] = p_data[2] + 1;
+    }
     if (!HalSendDownstream(dev.hHAL, nci_cmd, nci_cmd[2] + 3)) {
       STLOG_HAL_E("HAL st21nfc %s  SendDownstream failed", __func__);
       (void)pthread_mutex_unlock(&hal_mtx);
