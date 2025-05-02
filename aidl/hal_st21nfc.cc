@@ -39,12 +39,10 @@
 #endif
 #define VENDOR_LIB_EXT ".so"
 
-
 #define CRC_PRESET_A 0x6363
 #define CRC_PRESET_B 0xFFFF
 #define Type_A 0
 #define Type_B 1
-
 
 bool dbg_logging = false;
 
@@ -403,7 +401,7 @@ int StNfc_hal_write(uint16_t data_len, const uint8_t* p_data) {
              p_data[3] == 0x6) {
     DispHal("TX DATA", (p_data), data_len);
 
-    memcpy(nci_cmd+3, p_data+4, 4);
+    memcpy(nci_cmd + 3, p_data + 4, 4);
     nci_cmd[0] = 0x2f;
     nci_cmd[1] = 0x19;
 
@@ -448,8 +446,8 @@ int StNfc_hal_write(uint16_t data_len, const uint8_t* p_data) {
       memcpy(nci_cmd + ll_index, p_data + index, (tlv_len - 1) / 2);
       for (int i = 0; i < (tlv_len - 1) / 2; ++i) {
         if (p_data[index + i] != 0xFF) {
-            exact_match = false;
-            break;
+          exact_match = false;
+          break;
         }
       }
       ll_index += (tlv_len - 1) / 2;
@@ -460,14 +458,13 @@ int StNfc_hal_write(uint16_t data_len, const uint8_t* p_data) {
         nci_cmd[ll_index++] = crc_mask;
 
         if (!exact_match) {
-        nci_cmd[crc_index] = crc_mask;
-        nci_cmd[crc_index +1] = crc_mask;
+          nci_cmd[crc_index] = crc_mask;
+          nci_cmd[crc_index + 1] = crc_mask;
         }
-
       }
     }
     nci_length = ll_index;
-    nci_cmd[2] = ll_index -3;
+    nci_cmd[2] = ll_index - 3;
 
     if (!HalSendDownstream(dev.hHAL, nci_cmd, nci_length)) {
       STLOG_HAL_E("HAL st21nfc %s  SendDownstream failed", __func__);

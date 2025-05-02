@@ -93,7 +93,7 @@ static void* I2cWorkerThread(void* arg) {
   STLOG_HAL_D("echo thread started...\n");
   bool readOk = false;
   int eventNum = (notifyResetRequest <= 0) ? 2 : 3;
-  bool resetting= false;
+  bool resetting = false;
 
   do {
     event_table[0].fd = fidI2c;
@@ -232,9 +232,9 @@ static void* I2cWorkerThread(void* arg) {
       if (byte < 10) {
         reset[byte] = '\0';
       }
-      if (byte > 0 && reset[0] == '1' && resetting== false) {
+      if (byte > 0 && reset[0] == '1' && resetting == false) {
         STLOG_HAL_E("trigger NFCC reset.. \n");
-        resetting= true;
+        resetting = true;
         i2cResetPulse(fidI2c);
       }
     }

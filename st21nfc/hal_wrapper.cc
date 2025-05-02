@@ -563,9 +563,9 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
               mObserverMode = p_data[4];
             }
             if (!mObserveModeSuspended) {
-            p_data[5] = p_data[4];
+              p_data[5] = p_data[4];
             } else {
-              p_data[5] =  0x00;
+              p_data[5] = 0x00;
             }
           } else {
             if (p_data[7] != mObserverMode) {
