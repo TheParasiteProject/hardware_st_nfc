@@ -40,6 +40,7 @@ extern void I2cRecovery();
 static void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data);
 static void halWrapperCallback(uint8_t event, uint8_t event_status);
 static std::string hal_wrapper_state_to_str(uint16_t event);
+static void hal_wrapper_store_timeout_log();
 
 nfc_stack_callback_t* mHalWrapperCallback = NULL;
 nfc_stack_data_callback_t* mHalWrapperDataCallback = NULL;
@@ -848,13 +849,7 @@ static void halWrapperCallback(uint8_t event,
         STLOG_HAL_E("NFC-NCI HAL: %s  Timeout accessing the CLF.", __func__);
         HalSendDownstreamStopTimer(mHalHandle);
         I2cRecovery();
-        HalEventLogger::getInstance().log()
-            << __func__ << " Timeout accessing the CLF."
-            << " mHalWrapperState="
-            << hal_wrapper_state_to_str(mHalWrapperState)
-            << " mIsActiveRW=" << mIsActiveRW
-            << " mTimerStarted=" << mTimerStarted << std::endl;
-        HalEventLogger::getInstance().store_log();
+        hal_wrapper_store_timeout_log();
         abort();  // TODO: fix it when we have a better recovery method.
         return;
       }
@@ -872,13 +867,7 @@ static void halWrapperCallback(uint8_t event,
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
         STLOG_HAL_E("%s - Timer for FW update procedure timeout, retry",
                     __func__);
-        HalEventLogger::getInstance().log()
-            << __func__ << " Timer for FW update procedure timeout, retry"
-            << " mHalWrapperState="
-            << hal_wrapper_state_to_str(mHalWrapperState)
-            << " mIsActiveRW=" << mIsActiveRW
-            << " mTimerStarted=" << mTimerStarted << std::endl;
-        HalEventLogger::getInstance().store_log();
+        hal_wrapper_store_timeout_log();
         abort();  // TODO: fix it when we have a better recovery method.
         HalSendDownstreamStopTimer(mHalHandle);
         resetHandlerState();
@@ -901,13 +890,7 @@ static void halWrapperCallback(uint8_t event,
     case HAL_WRAPPER_STATE_PROP_CONFIG:
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
         STLOG_HAL_E("%s - Timer when sending conf parameters, retry", __func__);
-        HalEventLogger::getInstance().log()
-            << __func__ << " Timer when sending conf parameters, retry"
-            << " mHalWrapperState="
-            << hal_wrapper_state_to_str(mHalWrapperState)
-            << " mIsActiveRW=" << mIsActiveRW
-            << " mTimerStarted=" << mTimerStarted << std::endl;
-        HalEventLogger::getInstance().store_log();
+        hal_wrapper_store_timeout_log();
         abort();  // TODO: fix it when we have a better recovery method.
         HalSendDownstreamStopTimer(mHalHandle);
         resetHandlerState();
@@ -951,13 +934,7 @@ static void halWrapperCallback(uint8_t event,
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
         STLOG_HAL_E("NFC-NCI HAL: %s  Timeout at state: %s", __func__,
                     hal_wrapper_state_to_str(mHalWrapperState).c_str());
-        HalEventLogger::getInstance().log()
-            << __func__ << " Timer when sending conf parameters, retry"
-            << " mHalWrapperState="
-            << hal_wrapper_state_to_str(mHalWrapperState)
-            << " mIsActiveRW=" << mIsActiveRW
-            << " mTimerStarted=" << mTimerStarted << std::endl;
-        HalEventLogger::getInstance().store_log();
+        hal_wrapper_store_timeout_log();
         HalSendDownstreamStopTimer(mHalHandle);
         p_data[0] = 0x60;
         p_data[1] = 0x00;
@@ -976,12 +953,7 @@ static void halWrapperCallback(uint8_t event,
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
         STLOG_HAL_E("NFC-NCI HAL: %s  Timeout at state: %s", __func__,
                     hal_wrapper_state_to_str(mHalWrapperState).c_str());
-        HalEventLogger::getInstance().log()
-            << __func__ << " mHalWrapperState="
-            << hal_wrapper_state_to_str(mHalWrapperState)
-            << " mIsActiveRW=" << mIsActiveRW
-            << " mTimerStarted=" << mTimerStarted << std::endl;
-        HalEventLogger::getInstance().store_log();
+        hal_wrapper_store_timeout_log();
         HalSendDownstreamStopTimer(mHalHandle);
         p_data[0] = 0x60;
         p_data[1] = 0x00;
@@ -1000,12 +972,7 @@ static void halWrapperCallback(uint8_t event,
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
         STLOG_HAL_E("NFC-NCI HAL: %s  Timeout at state: %s", __func__,
                     hal_wrapper_state_to_str(mHalWrapperState).c_str());
-        HalEventLogger::getInstance().log()
-            << __func__ << " mHalWrapperState="
-            << hal_wrapper_state_to_str(mHalWrapperState)
-            << " mIsActiveRW=" << mIsActiveRW
-            << " mTimerStarted=" << mTimerStarted << std::endl;
-        HalEventLogger::getInstance().store_log();
+        hal_wrapper_store_timeout_log();
         HalSendDownstreamStopTimer(mHalHandle);
         p_data[0] = 0x60;
         p_data[1] = 0x00;
@@ -1025,12 +992,7 @@ static void halWrapperCallback(uint8_t event,
         STLOG_HAL_E("NFC-NCI HAL: %s  Timeout at state: %s", __func__,
                     hal_wrapper_state_to_str(mHalWrapperState).c_str());
         if (!storedLog) {
-          HalEventLogger::getInstance().log()
-              << __func__ << " Timeout at state: "
-              << hal_wrapper_state_to_str(mHalWrapperState)
-              << " mIsActiveRW=" << mIsActiveRW
-              << " mTimerStarted=" << mTimerStarted << std::endl;
-          HalEventLogger::getInstance().store_log();
+          hal_wrapper_store_timeout_log();
           storedLog = true;
         }
       }
@@ -1127,4 +1089,20 @@ static std::string hal_wrapper_state_to_str(uint16_t event) {
     default:
       return "Unknown";
   }
+}
+
+/*******************************************************************************
+**
+** Function         hal_wrapper_store_timeout_log
+**
+** Description      Store timeout event logs.
+**
+** Returns          void
+*******************************************************************************/
+static void hal_wrapper_store_timeout_log() {
+  HalEventLogger::getInstance().log()
+      << " Timeout at state: " << hal_wrapper_state_to_str(mHalWrapperState)
+      << " mIsActiveRW=" << mIsActiveRW << " mTimerStarted=" << mTimerStarted
+      << std::endl;
+  HalEventLogger::getInstance().store_log();
 }
