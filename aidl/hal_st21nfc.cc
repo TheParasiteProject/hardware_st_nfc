@@ -474,10 +474,17 @@ int StNfc_hal_write(uint16_t data_len, const uint8_t* p_data) {
   } else if (!memcmp(p_data, NCI_ANDROID_PREFIX, sizeof(NCI_ANDROID_PREFIX)) &&
              p_data[3] == 0x9) {
     DispHal("TX DATA", (p_data), data_len);
+    if (data_len < 5) {
+      STLOG_HAL_E("HAL st21nfc %s  data_len is too short", __func__);
+      (void)pthread_mutex_unlock(&hal_mtx);
+      return 0;
+    }
     memcpy(nci_cmd + 3, p_data + 4, data_len - 4);
 
-    uint16_t crc = iso14443_crc(nci_cmd + 7, nci_cmd[5] - 1, Type_A);
-
+    uint16_t crc = 0;
+    if (nci_cmd[5] > 0) {
+      crc = iso14443_crc(nci_cmd + 7, nci_cmd[5] - 1, Type_A);
+    }
     uint8_t len = p_data[2];
     nci_cmd[0] = 0x2f;
     nci_cmd[1] = 0x1d;
