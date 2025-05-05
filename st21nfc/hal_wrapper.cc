@@ -868,11 +868,16 @@ static void halWrapperCallback(uint8_t event,
         STLOG_HAL_E("%s - Timer for FW update procedure timeout, retry",
                     __func__);
         hal_wrapper_store_timeout_log();
-        abort();  // TODO: fix it when we have a better recovery method.
-        HalSendDownstreamStopTimer(mHalHandle);
-        resetHandlerState();
-        I2cResetPulse();
+        p_data[0] = 0x60;
+        p_data[1] = 0x00;
+        p_data[2] = 0x03;
+        p_data[3] = 0xAE;
+        p_data[4] = 0x00;
+        p_data[5] = 0x00;
+        data_len = 0x6;
+        mHalWrapperDataCallback(data_len, p_data);
         mHalWrapperState = HAL_WRAPPER_STATE_OPEN;
+        return;
       }
       break;
 
