@@ -33,6 +33,7 @@
 
 #include "android_logmsg.h"
 #include "hal_config.h"
+#include "hal_event_logger.h"
 #include "halcore.h"
 #include "halcore_private.h"
 
@@ -50,11 +51,13 @@
 #define ST21NFC_CLK_STATE _IOR(ST21NFC_MAGIC, 0x13, unsigned int)
 
 #define LINUX_DBGBUFFER_SIZE 300
+#define I2C_ERROR_COUNT_MAX 50
 
 static int fidI2c = 0;
 static int cmdPipe[2] = {0, 0};
 static int notifyResetRequest = 0;
 static bool recovery_mode = false;
+static uint16_t i2c_error_count = 0;
 
 static struct pollfd event_table[3];
 static pthread_t threadHandle = (pthread_t)NULL;
@@ -177,8 +180,15 @@ static void* I2cWorkerThread(void* arg) {
             }
           }
 
+          i2c_error_count = 0;
         } else {
           STLOG_HAL_E("! didn't read 3 requested bytes from i2c\n");
+          if (i2c_error_count < I2C_ERROR_COUNT_MAX) {
+            HalEventLogger::getInstance().log()
+                << "! didn't read 3 requested bytes from i2c, bytesRead:"
+                << bytesRead << " count:" << i2c_error_count << std::endl;
+            i2c_error_count++;
+          }
         }
 
         readOk = false;
