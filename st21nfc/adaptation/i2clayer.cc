@@ -172,7 +172,11 @@ static void* I2cWorkerThread(void* arg) {
               bytesRead = i2cRead(fidI2c, buffer + 3, remaining);
             }
             if (bytesRead == remaining) {
-              DispHal("RX DATA", buffer, 3 + bytesRead);
+              if ((buffer[0] == 0x6f) && (buffer[1] == 0x02)) {
+                if (mDisplayFwLog) DispHal("RX DATA", buffer, 3 + bytesRead);
+              } else {
+                DispHal("RX DATA", buffer, 3 + bytesRead);
+              }
               HalSendUpstream(hHAL, buffer, 3 + bytesRead);
             } else {
               readOk = false;

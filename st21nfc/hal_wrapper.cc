@@ -86,6 +86,8 @@ bool mPerTechCmdRsp = false;
 bool storedLog = false;
 bool mObserveModeSuspended = false;
 
+bool mDisplayFwLog = false;
+
 void wait_ready() {
   pthread_mutex_lock(&mutex);
   while (!ready_flag) {
@@ -120,6 +122,7 @@ bool hal_wrapper_open(st21nfc_dev_t* dev, nfc_stack_callback_t* p_cback,
   mObserverMode = 0;
   mObserverRsp = false;
   mObserveModeSuspended = false;
+  mDisplayFwLog = false;
 
   mHalWrapperCallback = p_cback;
   mHalWrapperDataCallback = p_data_cback;
@@ -451,10 +454,13 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
               if (firmware_debug_enabled || sEnableFwLog) {
                 num = 1;
                 swp_log = 30;
+                mDisplayFwLog = true;
               } else if (isDebuggable) {
                 swp_log = 30;
+                mDisplayFwLog = true;
               } else {
                 swp_log = 8;
+                mDisplayFwLog = false;
               }
               rf_log = 15;
 
