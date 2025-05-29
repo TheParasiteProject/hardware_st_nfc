@@ -286,7 +286,7 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
           STLOG_HAL_V("%s --- CLF mode is LOADER ---", __func__);
 
           if (mRetryFwDwl == 0) {
-            STLOG_HAL_V(
+            STLOG_HAL_W(
                 "%s - Reached maximum nb of retries, FW update failed, exiting",
                 __func__);
             mHalWrapperCallback(HAL_NFC_OPEN_CPLT_EVT, HAL_NFC_STATUS_FAILED);
@@ -298,7 +298,6 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
               FwUpdateHandler(mHalHandle, data_len, p_data);
             } else {
               STLOG_HAL_V("%s - Send APDU_GET_ATR_CMD", __func__);
-              mRetryFwDwl--;
               HalEventLogger::getInstance().log()
                   << __func__ << " Send APDU_GET_ATR_CMD" << std::endl;
               if (!HalSendDownstreamTimer(mHalHandle, ApduGetAtr,
@@ -307,6 +306,7 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
                 STLOG_HAL_E("%s - SendDownstream failed", __func__);
               }
             }
+            mRetryFwDwl--;
           }
         } else if (mFwUpdateTaskMask == 0 || mRetryFwDwl == 0) {
           STLOG_HAL_V("%s - Proceeding with normal startup", __func__);
