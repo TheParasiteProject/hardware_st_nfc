@@ -30,6 +30,7 @@
 #include "hal_fwlog.h"
 #include "halcore.h"
 #include "st21nfc_dev.h"
+#define OPEN_TIMEOUT_MAX_COUNT 5
 
 extern void HalCoreCallback(void* context, uint32_t event, const void* d,
                             size_t length);
@@ -85,6 +86,7 @@ bool mObserverRsp = false;
 bool mPerTechCmdRsp = false;
 bool storedLog = false;
 bool mObserveModeSuspended = false;
+static uint16_t OpenTimeoutCount = 0;
 
 bool mDisplayFwLog = false;
 
@@ -141,6 +143,7 @@ bool hal_wrapper_open(st21nfc_dev_t* dev, nfc_stack_callback_t* p_cback,
 
   HalEventLogger::getInstance().initialize();
   HalEventLogger::getInstance().log() << __func__ << std::endl;
+
   HalSendDownstreamTimer(mHalHandle, 10000);
 
   return 1;
@@ -852,11 +855,26 @@ static void halWrapperCallback(uint8_t event,
 
     case HAL_WRAPPER_STATE_OPEN:
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
-        STLOG_HAL_E("NFC-NCI HAL: %s  Timeout accessing the CLF.", __func__);
+        OpenTimeoutCount++;
+        STLOG_HAL_E(
+            "NFC-NCI HAL: %s  Timeout accessing the CLF. OpenTimeoutCount:d",
+            __func__, OpenTimeoutCount);
         HalSendDownstreamStopTimer(mHalHandle);
-        I2cRecovery();
         hal_wrapper_store_timeout_log();
-        abort();  // TODO: fix it when we have a better recovery method.
+        if (OpenTimeoutCount > OPEN_TIMEOUT_MAX_COUNT) {
+          mHalWrapperState = HAL_WRAPPER_STATE_CLOSED;
+          OpenTimeoutCount = 0;
+          return;
+        }
+        p_data[0] = 0x60;
+        p_data[1] = 0x00;
+        p_data[2] = 0x03;
+        p_data[3] = 0xAF;
+        p_data[4] = 0x00;
+        p_data[5] = 0x00;
+        data_len = 0x6;
+        mHalWrapperDataCallback(data_len, p_data);
+        mHalWrapperState = HAL_WRAPPER_STATE_OPEN;
         return;
       }
       break;

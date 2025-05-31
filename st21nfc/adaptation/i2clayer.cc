@@ -190,7 +190,8 @@ static void* I2cWorkerThread(void* arg) {
           if (i2c_error_count < I2C_ERROR_COUNT_MAX) {
             HalEventLogger::getInstance().log()
                 << "! didn't read 3 requested bytes from i2c, bytesRead:"
-                << bytesRead << " count:" << i2c_error_count << std::endl;
+                << bytesRead << " errno " << errno
+                << " count:" << i2c_error_count << std::endl;
             i2c_error_count++;
           }
         }
