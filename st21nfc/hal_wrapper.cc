@@ -1016,6 +1016,25 @@ static void halWrapperCallback(uint8_t event,
       }
       break;
 
+    case HAL_WRAPPER_STATE_RECOVERY:
+      if (event == HAL_WRAPPER_TIMEOUT_EVT) {
+        STLOG_HAL_E("NFC-NCI HAL: %s  Timeout at state: %s", __func__,
+                    hal_wrapper_state_to_str(mHalWrapperState).c_str());
+        hal_wrapper_store_timeout_log();
+        HalSendDownstreamStopTimer(mHalHandle);
+        p_data[0] = 0x60;
+        p_data[1] = 0x00;
+        p_data[2] = 0x03;
+        p_data[3] = 0xBA;
+        p_data[4] = 0x00;
+        p_data[5] = 0x00;
+        data_len = 0x6;
+        mHalWrapperDataCallback(data_len, p_data);
+        mHalWrapperState = HAL_WRAPPER_STATE_OPEN;
+        return;
+      }
+      break;
+
     default:
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
         STLOG_HAL_E("NFC-NCI HAL: %s  Timeout at state: %s", __func__,
