@@ -857,7 +857,7 @@ static void halWrapperCallback(uint8_t event,
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
         OpenTimeoutCount++;
         STLOG_HAL_E(
-            "NFC-NCI HAL: %s  Timeout accessing the CLF. OpenTimeoutCount:d",
+            "NFC-NCI HAL: %s  Timeout accessing the CLF. OpenTimeoutCount:%d",
             __func__, OpenTimeoutCount);
         HalSendDownstreamStopTimer(mHalHandle);
         hal_wrapper_store_timeout_log();
