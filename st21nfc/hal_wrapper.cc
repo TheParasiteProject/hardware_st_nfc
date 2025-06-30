@@ -22,6 +22,7 @@
 #include <hardware/nfc.h>
 #include <log/log.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "android_logmsg.h"
@@ -29,6 +30,7 @@
 #include "hal_fd.h"
 #include "hal_fwlog.h"
 #include "halcore.h"
+#include "i2clayer.h"
 #include "st21nfc_dev.h"
 #define OPEN_TIMEOUT_MAX_COUNT 5
 
@@ -733,6 +735,8 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
                         sizeof(hal_ctrl_clk));
             if (hal_ctrl_clk) {
               STLOG_HAL_E("%s - Clock Error - restart", __func__);
+              STLOG_HAL_E("%s ST21NFC_CLK_STATE:%d", __func__,
+                          ioctl(fidI2c, ST21NFC_CLK_STATE, NULL));
               // Core Generic Error
               p_data[0] = 0x60;
               p_data[1] = 0x00;
