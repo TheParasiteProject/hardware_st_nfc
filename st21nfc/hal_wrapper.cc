@@ -114,6 +114,7 @@ bool hal_wrapper_open(st21nfc_dev_t* dev, nfc_stack_callback_t* p_cback,
 
   STLOG_HAL_D("%s", __func__);
 
+  set_ready(0);
   mFwUpdateResMask = hal_fd_init();
   mRetryFwDwl = 5;
   mFwUpdateTaskMask = 0;
@@ -147,6 +148,7 @@ bool hal_wrapper_open(st21nfc_dev_t* dev, nfc_stack_callback_t* p_cback,
   HalEventLogger::getInstance().log() << __func__ << std::endl;
 
   HalSendDownstreamTimer(mHalHandle, 10000);
+  wait_ready();
 
   return 1;
 }
@@ -353,6 +355,7 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
       } else {
         mHalWrapperDataCallback(data_len, p_data);
       }
+      set_ready(1);
       break;
     case HAL_WRAPPER_STATE_OPEN_CPLT:  // 2
       STLOG_HAL_V("%s - mHalWrapperState = HAL_WRAPPER_STATE_OPEN_CPLT",
@@ -859,6 +862,7 @@ static void halWrapperCallback(uint8_t event,
 
     case HAL_WRAPPER_STATE_OPEN:
       if (event == HAL_WRAPPER_TIMEOUT_EVT) {
+        set_ready(1);
         OpenTimeoutCount++;
         STLOG_HAL_E(
             "NFC-NCI HAL: %s  Timeout accessing the CLF. OpenTimeoutCount:%d",
