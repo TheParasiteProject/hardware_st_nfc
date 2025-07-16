@@ -36,6 +36,7 @@ HalEventLogger& HalEventLogger::getInstance() {
   return nfc_event_eventLogger;
 }
 HalEventLogger& HalEventLogger::log() {
+  std::lock_guard<std::mutex> lock(mMutex);
   struct timespec tv;
   clock_gettime(CLOCK_REALTIME, &tv);
   time_t rawtime = tv.tv_sec;
