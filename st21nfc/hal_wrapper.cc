@@ -247,7 +247,7 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
   int mObserverLength = 0;
   int nciPropEnableFwDbgTraces_size = sizeof(nciPropEnableFwDbgTraces);
 
-  if (mObserverMode && (p_data[0] == 0x6f) && (p_data[1] == 0x02)) {
+  if (mObserverMode && !mObserveModeSuspended && (p_data[0] == 0x6f) && (p_data[1] == 0x02)) {
     // Firmware logs must not be formatted before sending to upper layer.
     if ((mObserverLength = notifyPollingLoopFrames(
              p_data, data_len, nciAndroidPassiveObserver)) > 0) {
