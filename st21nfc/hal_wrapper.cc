@@ -88,6 +88,7 @@ bool mObserverRsp = false;
 bool mPerTechCmdRsp = false;
 bool storedLog = false;
 bool mObserveModeSuspended = false;
+bool mObserveModeSuspendPendingNotifyPollingLoop = false;
 static uint16_t OpenTimeoutCount = 0;
 
 bool mDisplayFwLog = false;
@@ -127,6 +128,7 @@ bool hal_wrapper_open(st21nfc_dev_t* dev, nfc_stack_callback_t* p_cback,
   mObserverMode = 0;
   mObserverRsp = false;
   mObserveModeSuspended = false;
+  mObserveModeSuspendPendingNotifyPollingLoop = false;
   mDisplayFwLog = false;
 
   mHalWrapperCallback = p_cback;
@@ -229,6 +231,7 @@ void hal_wrapper_set_observer_mode(uint8_t enable, bool per_tech_cmd) {
   mObserverRsp = true;
   mPerTechCmdRsp = per_tech_cmd;
   mObserveModeSuspended = false;
+  mObserveModeSuspendPendingNotifyPollingLoop = false;
 }
 void hal_wrapper_get_observer_mode() { mObserverRsp = true; }
 
@@ -248,6 +251,10 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
   int nciPropEnableFwDbgTraces_size = sizeof(nciPropEnableFwDbgTraces);
 
   if (mObserverMode && !mObserveModeSuspended && (p_data[0] == 0x6f) && (p_data[1] == 0x02)) {
+    if (mObserveModeSuspendPendingNotifyPollingLoop){
+        mObserveModeSuspended = true;
+        mObserveModeSuspendPendingNotifyPollingLoop = false;
+    }
     // Firmware logs must not be formatted before sending to upper layer.
     if ((mObserverLength = notifyPollingLoopFrames(
              p_data, data_len, nciAndroidPassiveObserver)) > 0) {
@@ -609,7 +616,7 @@ void halWrapperDataCallback(uint16_t data_len, uint8_t* p_data) {
         DispHal("RX DATA", (p_data), data_len);
       } else if ((p_data[0] == 0x6f) && (p_data[1] == 0x1b)) {
         // PROP_RF_OBSERVE_MODE_SUSPENDED_NTF
-        mObserveModeSuspended = true;
+        mObserveModeSuspendPendingNotifyPollingLoop = true;
         // Remove two byte CRC at end of frame.
         data_len -= 2;
         p_data[2] -= 2;
