@@ -87,6 +87,7 @@ void HalEventLogger::initialize() {
 }
 
 void HalEventLogger::store_log() {
+  std::lock_guard<std::mutex> lock(mMutex);
   LOG(DEBUG) << __func__;
   if (!logging_enabled) return;
   std::ofstream logFile;
@@ -108,6 +109,7 @@ void HalEventLogger::store_log() {
 }
 
 void HalEventLogger::dump_log(int fd) {
+  std::lock_guard<std::mutex> lock(mMutex);
   LOG(DEBUG) << __func__;
   if (!logging_enabled) return;
   std::ostringstream oss;
