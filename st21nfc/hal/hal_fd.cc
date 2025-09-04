@@ -505,11 +505,8 @@ void ExitHibernateHandler(HALHANDLE mHalHandle, uint16_t data_len,
             "%s - send NCI_PROP_NFC_FW_UPDATE_CMD and use 100 ms timer for "
             "each cmd from here",
             __func__);
-        HalEventLogger::getInstance().log()
-            << __func__
-            << " send NCI_PROP_NFC_FW_UPDATE_CMD and use 100 ms timer for "
-               "each cmd from here "
-            << std::endl;
+        HalEventLogger::getInstance().store_timer_activity(
+            "send NCI_PROP_NFC_FW_UPDATE_CM", FW_TIMER_DURATION);
         if (!HalSendDownstreamTimer(mHalHandle, NciPropNfcFwUpdate,
                                     sizeof(NciPropNfcFwUpdate),
                                     FW_TIMER_DURATION)) {
@@ -630,8 +627,8 @@ void UpdateHandler(HALHANDLE mHalHandle, uint16_t data_len, uint8_t* p_data) {
 
       if ((p_data[data_len - 2] == 0x90) && (p_data[data_len - 1] == 0x00)) {
         STLOG_HAL_D("%s - send APDU_AUTHENTICATION_CMD", __func__);
-        HalEventLogger::getInstance().log()
-            << __func__ << " send APDU_AUTHENTICATION_CMD " << std::endl;
+        HalEventLogger::getInstance().store_timer_activity(
+            "send APDU_AUTHENTICATION_CMD", FW_TIMER_DURATION);
         if (!HalSendDownstreamTimer(mHalHandle, (uint8_t*)mApduAuthent,
                                     sizeof(mApduAuthent), FW_TIMER_DURATION)) {
           STLOG_HAL_E("%s - SendDownstream failed", __func__);
@@ -651,10 +648,8 @@ void UpdateHandler(HALHANDLE mHalHandle, uint16_t data_len, uint8_t* p_data) {
           STLOG_HAL_D(
               " %s - send APDU_ERASE_FLASH_CMD (keep appli and NDEF areas)",
               __func__);
-          HalEventLogger::getInstance().log()
-              << __func__
-              << " send APDU_ERASE_FLASH_CMD (keep appli and NDEF areas "
-              << std::endl;
+          HalEventLogger::getInstance().store_timer_activity(
+              "send APDU_ERASE_FLASH_CMD", FW_TIMER_DURATION);
           if (!HalSendDownstreamTimer(mHalHandle, ApduEraseNfcKeepAppliAndNdef,
                                       sizeof(ApduEraseNfcKeepAppliAndNdef),
                                       FW_TIMER_DURATION)) {
@@ -699,8 +694,8 @@ void UpdateHandler(HALHANDLE mHalHandle, uint16_t data_len, uint8_t* p_data) {
           if ((fread(mBinData, sizeof(uint8_t), 3, mFwFileBin) == 3) &&
               (fread(mBinData + 3, sizeof(uint8_t), mBinData[2], mFwFileBin) ==
                mBinData[2])) {
-            HalEventLogger::getInstance().log()
-                << __func__ << " Last Tx was NOK. Retry " << std::endl;
+            HalEventLogger::getInstance().store_timer_activity(
+                "Last Tx was NOK. Retry", FW_TIMER_DURATION);
             if (!HalSendDownstreamTimer(mHalHandle, mBinData, mBinData[2] + 3,
                                         FW_TIMER_DURATION)) {
               STLOG_HAL_E("%s - SendDownstream failed", __func__);
@@ -758,9 +753,8 @@ static void UpdateHandlerST54L(HALHANDLE mHalHandle, uint16_t data_len,
 
   switch (mHalFD54LState) {
     case HAL_FD_ST54L_STATE_PUY_KEYUSER:
-      HalEventLogger::getInstance().log()
-          << __func__ << " mHalFD54LState: " << HAL_FD_ST54L_STATE_PUY_KEYUSER
-          << std::endl;
+      HalEventLogger::getInstance().store_timer_activity("ApduPutKeyUser1",
+                                                         FW_TIMER_DURATION);
       if (!HalSendDownstreamTimer(
               mHalHandle, (uint8_t*)ApduPutKeyUser1[mFWInfo->chipProdType],
               sizeof(ApduPutKeyUser1[mFWInfo->chipProdType]),
@@ -772,10 +766,8 @@ static void UpdateHandlerST54L(HALHANDLE mHalHandle, uint16_t data_len,
 
     case HAL_FD_ST54L_STATE_ERASE_UPGRADE_START:
       if ((p_data[data_len - 2] == 0x90) && (p_data[data_len - 1] == 0x00)) {
-        HalEventLogger::getInstance().log()
-            << __func__
-            << " mHalFD54LState: " << HAL_FD_ST54L_STATE_ERASE_UPGRADE_START
-            << std::endl;
+        HalEventLogger::getInstance().store_timer_activity(
+            "ApduEraseUpgradeStart", FW_TIMER_DURATION);
         if (!HalSendDownstreamTimer(mHalHandle, (uint8_t*)ApduEraseUpgradeStart,
                                     sizeof(ApduEraseUpgradeStart),
                                     FW_TIMER_DURATION)) {
@@ -790,10 +782,8 @@ static void UpdateHandlerST54L(HALHANDLE mHalHandle, uint16_t data_len,
 
     case HAL_FD_ST54L_STATE_ERASE_NFC_AREA:
       if ((p_data[data_len - 2] == 0x90) && (p_data[data_len - 1] == 0x00)) {
-        HalEventLogger::getInstance().log()
-            << __func__
-            << " mHalFD54LState: " << HAL_FD_ST54L_STATE_ERASE_NFC_AREA
-            << std::endl;
+        HalEventLogger::getInstance().store_timer_activity("ApduEraseNfcArea",
+                                                           FW_TIMER_DURATION);
         if (!HalSendDownstreamTimer(mHalHandle, (uint8_t*)ApduEraseNfcArea,
                                     sizeof(ApduEraseNfcArea),
                                     FW_TIMER_DURATION)) {
@@ -808,10 +798,8 @@ static void UpdateHandlerST54L(HALHANDLE mHalHandle, uint16_t data_len,
 
     case HAL_FD_ST54L_STATE_ERASE_UPGRADE_STOP:
       if ((p_data[data_len - 2] == 0x90) && (p_data[data_len - 1] == 0x00)) {
-        HalEventLogger::getInstance().log()
-            << __func__
-            << " mHalFD54LState: " << HAL_FD_ST54L_STATE_ERASE_UPGRADE_STOP
-            << std::endl;
+        HalEventLogger::getInstance().store_timer_activity(
+            "ApduEraseUpgradeStop", FW_TIMER_DURATION);
         if (!HalSendDownstreamTimer(mHalHandle, (uint8_t*)ApduEraseUpgradeStop,
                                     sizeof(ApduEraseUpgradeStop),
                                     FW_TIMER_DURATION)) {
@@ -835,16 +823,16 @@ static void UpdateHandlerST54L(HALHANDLE mHalHandle, uint16_t data_len,
           if ((fread(mBinData, sizeof(uint8_t), 3, mFwFileBin) == 3) &&
               (fread(mBinData + 3, sizeof(uint8_t), mBinData[2], mFwFileBin) ==
                mBinData[2])) {
-            HalEventLogger::getInstance().log()
-                << __func__ << "  LINE: " << __LINE__ << std::endl;
+            HalEventLogger::getInstance().store_timer_activity(
+                "mBinData", FW_TIMER_DURATION);
             if (!HalSendDownstreamTimer(mHalHandle, mBinData, mBinData[2] + 3,
                                         FW_TIMER_DURATION)) {
               STLOG_HAL_E("%s - SendDownstream failed", __func__);
             }
           } else {
             STLOG_HAL_D("%s - EOF of FW binary", __func__);
-            HalEventLogger::getInstance().log()
-                << __func__ << "  EOF of FW binary " << std::endl;
+            HalEventLogger::getInstance().store_timer_activity(
+                "ApduSetVariousConfig", FW_TIMER_DURATION);
             if (!HalSendDownstreamTimer(
                     mHalHandle, (uint8_t*)ApduSetVariousConfig,
                     sizeof(ApduSetVariousConfig), FW_TIMER_DURATION)) {
@@ -859,8 +847,8 @@ static void UpdateHandlerST54L(HALHANDLE mHalHandle, uint16_t data_len,
           if ((fread(mBinData, sizeof(uint8_t), 3, mFwFileBin) == 3) &&
               (fread(mBinData + 3, sizeof(uint8_t), mBinData[2], mFwFileBin) ==
                mBinData[2])) {
-            HalEventLogger::getInstance().log()
-                << __func__ << "  Last Tx was NOK. Retry " << std::endl;
+            HalEventLogger::getInstance().store_timer_activity(
+                "Last Tx was NOK. Retry", FW_TIMER_DURATION);
             if (!HalSendDownstreamTimer(mHalHandle, mBinData, mBinData[2] + 3,
                                         FW_TIMER_DURATION)) {
               STLOG_HAL_E("%s - SendDownstream failed", __func__);
@@ -868,8 +856,8 @@ static void UpdateHandlerST54L(HALHANDLE mHalHandle, uint16_t data_len,
             fgetpos(mFwFileBin, &mPos);  // save current position in stream
           } else {
             STLOG_HAL_D("%s - EOF of FW binary", __func__);
-            HalEventLogger::getInstance().log()
-                << __func__ << "  LINE: " << __LINE__ << std::endl;
+            HalEventLogger::getInstance().store_timer_activity(
+                "ApduSetVariousConfig", FW_TIMER_DURATION);
             if (!HalSendDownstreamTimer(
                     mHalHandle, (uint8_t*)ApduSetVariousConfig,
                     sizeof(ApduSetVariousConfig), FW_TIMER_DURATION)) {
@@ -1135,7 +1123,8 @@ void ApplyUwbParamHandler(HALHANDLE mHalHandle, uint16_t data_len,
 
 void SendExitLoadMode(HALHANDLE mmHalHandle) {
   STLOG_HAL_D("%s - Send APDU_EXIT_LOAD_MODE_CMD", __func__);
-  HalEventLogger::getInstance().log() << __func__ << std::endl;
+  HalEventLogger::getInstance().store_timer_activity(
+      "Send APDU_EXIT_LOAD_MODE_CMD", FW_TIMER_DURATION);
   if (!HalSendDownstreamTimer(mmHalHandle, ApduExitLoadMode,
                               sizeof(ApduExitLoadMode), FW_TIMER_DURATION)) {
     STLOG_HAL_E("%s - SendDownstream failed", __func__);
@@ -1145,7 +1134,8 @@ void SendExitLoadMode(HALHANDLE mmHalHandle) {
 
 void SendSwitchToUserMode(HALHANDLE mmHalHandle) {
   STLOG_HAL_D("%s: enter", __func__);
-  HalEventLogger::getInstance().log() << __func__ << std::endl;
+  HalEventLogger::getInstance().store_timer_activity("SendSwitchToUserMode",
+                                                     FW_TIMER_DURATION);
   if (!HalSendDownstreamTimer(mmHalHandle, ApduSwitchToUser,
                               sizeof(ApduSwitchToUser), FW_TIMER_DURATION)) {
     STLOG_HAL_E("%s - SendDownstream failed", __func__);
