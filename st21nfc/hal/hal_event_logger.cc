@@ -31,6 +31,8 @@
 #define HAL_LOG_FILE_SIZE 32 * 1024 * 1024
 #define HAL_MEM_BUFFER_SIZE 256 * 1024
 
+TimerActivity TimerAct;
+
 HalEventLogger& HalEventLogger::getInstance() {
   static HalEventLogger nfc_event_eventLogger;
   return nfc_event_eventLogger;
@@ -84,6 +86,8 @@ void HalEventLogger::initialize() {
   }
   EventFilePath = HalLogPath;
   EventFilePath += "/hal_event_log.txt";
+
+  store_timer_activity("none", 0);
 }
 
 void HalEventLogger::store_log() {
@@ -134,4 +138,9 @@ void HalEventLogger::dump_log(int fd) {
   ::android::base::WriteStringToFd(oss.str(), fd);
   dprintf(fd, "===== Nfc HAL Event Log v1 =====\n");
   fsync(fd);
+}
+
+void HalEventLogger::store_timer_activity(std::string activity, uint32_t duration) {
+  TimerAct.activity = activity;
+  TimerAct.duration = duration;
 }

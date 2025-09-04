@@ -28,6 +28,7 @@ class HalEventLogger {
   void dump_log(int fd);
   void initialize();
   void store_log();
+  void store_timer_activity(std::string activity, uint32_t duration);
 
   template <typename T>
   HalEventLogger& operator<<(const T& value) {
@@ -52,3 +53,10 @@ class HalEventLogger {
   std::string EventFilePath;
   std::mutex mMutex;
 };
+
+struct TimerActivity {
+  std::string activity;
+  uint32_t duration;
+};
+
+extern TimerActivity TimerAct;
