@@ -28,6 +28,7 @@
 #include "android_logmsg.h"
 #include "hal_event_logger.h"
 #include "halcore.h"
+#include "halcore_private.h"
 /* Initialize fw info structure pointer used to access fw info structure */
 FWInfo* mFWInfo = NULL;
 
@@ -35,6 +36,7 @@ FWCap* mFWCap = NULL;
 
 FILE* mFwFileBin;
 FILE* mCustomFileBin;
+FILE* mCustomFileTxt;
 fpos_t mPos;
 fpos_t mPosInit;
 uint8_t mBinData[260];
@@ -48,6 +50,9 @@ uint8_t* pCmd;
 int mFWRecovCount = 0;
 const char* FwType = "generic";
 char mApduAuthent[24];
+
+uint8_t txtCmd[MAX_BUFFER_SIZE];
+uint16_t txtCmdLen = 0;
 
 static const uint8_t propNfcModeSetCmdOn[] = {0x2f, 0x02, 0x02, 0x02, 0x01};
 static const uint8_t coreInitCmd[] = {0x20, 0x01, 0x02, 0x00, 0x00};
@@ -121,6 +126,20 @@ void SendSwitchToUserMode(HALHANDLE mmHalHandle);
 extern void hal_wrapper_update_complete();
 
 typedef size_t (*STLoadUwbParams)(void* out_buff, size_t buf_size);
+
+static int ascii2hex(char c) {
+  int res = -1;
+
+  if ((c >= '0') && (c <= '9')) {
+    res = c - '0';
+  } else if ((c >= 'A') && (c <= 'F')) {
+    res = c - 'A' + 10;
+  } else if ((c >= 'a') && (c <= 'f')) {
+    res = c - 'a' + 10;
+  }
+
+  return res;
+}
 
 /***********************************************************************
  * Determine UserKey
@@ -229,6 +248,7 @@ int hal_fd_init() {
 
   mFwFileBin = NULL;
   mCustomFileBin = NULL;
+  mCustomFileTxt = NULL;
 
   // Check if FW patch binary file is present
   // If not, get recovery FW patch file
@@ -291,12 +311,40 @@ int hal_fd_init() {
   if ((mCustomFileBin = fopen((char*)ConfPath, "r")) == NULL) {
     STLOG_HAL_D("%s - st21nfc custom configuration not detected\n", __func__);
   } else {
+    char conf_line[600];
+    uint16_t fwconf_crc = 0;
+    if (fwConfName[strlen(fwConfName) - 1] == 't') {
+      mCustomFileTxt = mCustomFileBin;
+      mCustomFileBin = NULL;
+      STLOG_HAL_D("text configuration detected\n");
+      fgets(conf_line, sizeof conf_line, mCustomFileTxt);
+      if ((conf_line[0] == 'R') && (conf_line[11] == 'C') &&
+          (conf_line[12] == 'R')) {
+        fwconf_crc = ascii2hex(conf_line[21]) |
+                     ((ascii2hex(conf_line[20]) << 4) & 0xF0) |
+                     ((ascii2hex(conf_line[19]) << 8) & 0xF00) |
+                     ((ascii2hex(conf_line[18]) << 12) & 0xF000);
+        mFWInfo->fileCustVersion = fwconf_crc;
+        STLOG_HAL_D("-> txt configuration CRC 0x%04X \n",
+                    mFWInfo->fileCustVersion);
+      result |= FW_CUSTOM_PARAM_AVAILABLE;
+      } else {
+        STLOG_HAL_E("text configuration invalid content\n");
+        fclose(mCustomFileTxt);
+        mCustomFileTxt = NULL;
+      }
+    } else if (fwConfName[strlen(fwConfName) - 1] == 'n') {
     STLOG_HAL_D("%s - %s file detected\n", __func__, ConfPath);
     fread(mBinData, sizeof(uint8_t), 2, mCustomFileBin);
     mFWInfo->fileCustVersion = mBinData[0] << 8 | mBinData[1];
     STLOG_HAL_D("%s --> st21nfc_custom configuration version 0x%04X \n",
                 __func__, mFWInfo->fileCustVersion);
     result |= FW_CUSTOM_PARAM_AVAILABLE;
+    } else {
+      STLOG_HAL_E("configuration file name not recognized\n");
+      fclose(mCustomFileBin);
+      mCustomFileBin = NULL;
+    }
   }
 
   if (ft_CheckUWBConf()) {
@@ -320,6 +368,10 @@ void hal_fd_close() {
   if (mCustomFileBin != NULL) {
     fclose(mCustomFileBin);
     mCustomFileBin = NULL;
+  }
+  if (mCustomFileTxt != NULL) {
+    fclose(mCustomFileTxt);
+    mCustomFileTxt = NULL;
   }
 }
 
@@ -921,6 +973,102 @@ void FwUpdateHandler(HALHANDLE mHalHandle, uint16_t data_len, uint8_t* p_data) {
   }
 }
 
+/*******************************************************************************
+ ** Function
+ **
+ ** Description   ASCII to Hexadecimal conversion (whole line)
+ **
+ ** @param input, a \0-terminated string with ASCII bytes representation (e.g. 01
+ ** 23 45). Spaces are allowed, but must be aligned on bytes boundaries.
+ ** @param pCmd, converted bytes are stored here.
+ ** @param maxLen, storage size of pCmd
+ ** @param pcmdlen, how many bytes have been written upon return.
+ ** @return 0 on success, -1 on failure
+ *******************************************************************************/
+static int convstr2hex(char* input, uint8_t* pCmd, int maxLen,
+                       uint16_t* pcmdlen) {
+  char* in = input;
+  int c;
+  *pcmdlen = 0;
+
+  while ((in[0] != '\0') && (in[1] != '\0') &&
+         (*pcmdlen < maxLen))  // we need at least 2 characters left
+  {
+    // Skip white spaces
+    if (in[0] == ' ' || in[0] == '\t' || in[0] == '\r' || in[0] == '\n') {
+      in++;
+      continue;
+    }
+
+    // Is MSB char a valid HEX value ?
+    c = ascii2hex(*in);
+    if (c < 0) {
+      STLOG_HAL_E("    Error: invalid character (%x,'%c')\n", *in, *in);
+      return -1;
+    }
+    // Store it
+    pCmd[*pcmdlen] = c << 4;
+    in++;
+
+    // Is LSB char a valid HEX value ?
+    c = ascii2hex(*in);
+    if (c < 0) {
+      STLOG_HAL_E("    Error: invalid character (%x,'%c')\n", *in, *in);
+      return -1;
+    }
+    // Store it
+    pCmd[*pcmdlen] |= c;
+    in++;
+    (*pcmdlen)++;
+  }
+
+  if (*pcmdlen == maxLen) {
+    STLOG_HAL_D("    Warning: input conversion may be truncated\n");
+  }
+
+  return 0;
+}
+
+int ft_FwConfConvertor(char* string_cmd, uint8_t pCmd[256], uint16_t* pcmdlen) {
+  uint16_t converted;
+  int res = convstr2hex(string_cmd, pCmd + 3, 256 - 3, &converted);
+  if (res < 0) {
+    *pcmdlen = 0;
+    return 0;
+  }
+  // We should be able to propagate an error here, TODO: if (res < 0) ....
+  pCmd[0] = 0x2F;
+  pCmd[1] = 0x02;
+  pCmd[2] = converted;
+  *pcmdlen = converted + 3;
+  return 1;
+}
+// parse st21nfc_conf.txt until next command to send.
+// return 1 if a command was found, 0 if EOF
+int getNextCommandInTxt(uint8_t* cmd, uint16_t* sz) {
+  int ret = 0;
+  // f_cust_txt is already opened and 1st line read
+  char conf_line[600];
+
+  while (fgets(conf_line, sizeof conf_line, mCustomFileTxt) != NULL) {
+    if (!strncmp(conf_line, "NCI_SEND_PROP", sizeof("NCI_SEND_PROP") - 1)) {
+      STLOG_HAL_V("%s : parse %s", __func__, conf_line);
+      ret = ft_FwConfConvertor((char*)conf_line + 20, cmd, sz);
+      break;
+    } else if (!strncmp(conf_line, "NCI_DIRECT_CTRL",
+                        sizeof("NCI_DIRECT_CTRL") - 1)) {
+      STLOG_HAL_V("%s : parse %s", __func__, conf_line);
+      ret = ft_FwConfConvertor((char*)conf_line + 22, cmd, sz);
+      break;
+    } else {
+      // any other, we ignore
+      STLOG_HAL_V("%s : ignore %s", __func__, conf_line);
+    }
+  }
+
+  return ret;
+}
+
 void ApplyCustomParamHandler(HALHANDLE mHalHandle, uint16_t data_len,
                              uint8_t* p_data) {
   STLOG_HAL_D("%s - Enter ", __func__);
@@ -929,107 +1077,181 @@ void ApplyCustomParamHandler(HALHANDLE mHalHandle, uint16_t data_len,
     return;
   }
 
-  switch (p_data[0]) {
-    case 0x40:  //
-      // CORE_RESET_RSP
-      if ((p_data[1] == 0x0) && (p_data[3] == 0x0)) {
-        // do nothing
-      } else if ((p_data[1] == 0x1) && (p_data[3] == 0x0)) {
-        if (mFWInfo->hibernate_exited == 0) {
-          // Send a NFC mode on .
-          if (!HalSendDownstream(mHalHandle, propNfcModeSetCmdOn,
-                                 sizeof(propNfcModeSetCmdOn))) {
+  if (mCustomFileTxt != NULL) {
+    switch (p_data[0]) {
+      case 0x40:  //
+        // CORE_RESET_RSP
+        if ((p_data[1] == 0x0) && (p_data[3] == 0x0)) {
+          // do nothing
+        } else if ((p_data[1] == 0x1) && (p_data[3] == 0x0)) {
+          if (mFWInfo->hibernate_exited == 0) {
+            // Send a NFC mode on .
+            if (!HalSendDownstream(mHalHandle, propNfcModeSetCmdOn,
+                                   sizeof(propNfcModeSetCmdOn))) {
+              STLOG_HAL_E("%s - SendDownstream failed", __func__);
+            }
+            // CORE_INIT_RSP
+          } else if (mFWInfo->hibernate_exited == 1) {
+            if (getNextCommandInTxt(txtCmd, &txtCmdLen)) {
+              if (!HalSendDownstream(mHalHandle, txtCmd, txtCmdLen)) {
+                STLOG_HAL_E("NFC-NCI HAL: %s  SendDownstream failed", __func__);
+              }
+            }
+          }
+
+        } else {
+          STLOG_HAL_D("%s - Error in custom param application", __func__);
+          mCustomParamFailed = true;
+          I2cResetPulse();
+          hal_wrapper_set_state(HAL_WRAPPER_STATE_OPEN);
+        }
+        break;
+
+      case 0x4f:
+        if (mFWInfo->hibernate_exited == 1) {
+          // Check if an error has occurred for PROP_SET_CONFIG_CMD
+          if (p_data[3] != 0x00) {
+            STLOG_HAL_D("%s - Error in custom file, retry", __func__);
+            // should we need to limit number of retry ? to be decided if this
+            // error is found
+            usleep(5000);
+            if (!HalSendDownstream(mHalHandle, txtCmd, txtCmdLen)) {
+              STLOG_HAL_E("NFC-NCI HAL: %s  SendDownstream failed", __func__);
+            }
+          } else if (getNextCommandInTxt(txtCmd, &txtCmdLen)) {
+            if (!HalSendDownstream(mHalHandle, txtCmd, txtCmdLen)) {
+              STLOG_HAL_E("NFC-NCI HAL: %s  SendDownstream failed", __func__);
+            }
+          } else {
+            STLOG_HAL_D("%s - EOF of custom file", __func__);
+            mCustomParamDone = true;
+            I2cResetPulse();
+          }
+        }
+        break;
+
+      case 0x60:  //
+        if (p_data[1] == 0x0) {
+          if (p_data[3] == 0xa0) {
+            mFWInfo->hibernate_exited = 1;
+          }
+          if (!HalSendDownstream(mHalHandle, coreInitCmd,
+                                 sizeof(coreInitCmd))) {
             STLOG_HAL_E("%s - SendDownstream failed", __func__);
           }
-          // CORE_INIT_RSP
-        } else if (mFWInfo->hibernate_exited == 1) {
-          if ((fread(mBinData, sizeof(uint8_t), 3, mCustomFileBin)) &&
+
+        } else if ((p_data[1] == 0x6) && mCustomParamDone) {
+          mCustomParamDone = false;
+          hal_wrapper_update_complete();
+        }
+        break;
+    }
+
+  } else if (mCustomFileBin != NULL) {
+    switch (p_data[0]) {
+      case 0x40:  //
+        // CORE_RESET_RSP
+        if ((p_data[1] == 0x0) && (p_data[3] == 0x0)) {
+          // do nothing
+        } else if ((p_data[1] == 0x1) && (p_data[3] == 0x0)) {
+          if (mFWInfo->hibernate_exited == 0) {
+            // Send a NFC mode on .
+            if (!HalSendDownstream(mHalHandle, propNfcModeSetCmdOn,
+                                   sizeof(propNfcModeSetCmdOn))) {
+              STLOG_HAL_E("%s - SendDownstream failed", __func__);
+            }
+            // CORE_INIT_RSP
+          } else if (mFWInfo->hibernate_exited == 1) {
+            if ((fread(mBinData, sizeof(uint8_t), 3, mCustomFileBin)) &&
+                (fread(mBinData + 3, sizeof(uint8_t), mBinData[2],
+                       mCustomFileBin))) {
+              if (!HalSendDownstream(mHalHandle, mBinData, mBinData[2] + 3)) {
+                STLOG_HAL_E("%s - SendDownstream failed", __func__);
+              }
+            }
+          }
+
+        } else {
+          STLOG_HAL_D("%s - Error in custom param application", __func__);
+          mCustomParamFailed = true;
+          I2cResetPulse();
+          hal_wrapper_set_state(HAL_WRAPPER_STATE_OPEN);
+        }
+        break;
+
+      case 0x4f:
+        if (mFWInfo->hibernate_exited == 1) {
+          if ((fread(mBinData, sizeof(uint8_t), 3, mCustomFileBin) == 3) &&
               (fread(mBinData + 3, sizeof(uint8_t), mBinData[2],
-                     mCustomFileBin))) {
+                     mCustomFileBin) == mBinData[2])) {
             if (!HalSendDownstream(mHalHandle, mBinData, mBinData[2] + 3)) {
               STLOG_HAL_E("%s - SendDownstream failed", __func__);
             }
+          } else {
+            STLOG_HAL_D("%s - mCustomParamDone = %d", __func__,
+                        mCustomParamDone);
+            if (!mGetCustomerField) {
+              mGetCustomerField = true;
+              if (!HalSendDownstream(mHalHandle, nciGetPropConfig,
+                                     sizeof(nciGetPropConfig))) {
+                STLOG_HAL_E("%s - SendDownstream failed", __func__);
+              }
+              mGetCustomerField = true;
+
+            } else if (!mCustomParamDone) {
+              STLOG_HAL_D("%s - EOF of custom file.", __func__);
+              memset(nciPropSetConfig_CustomField, 0x0,
+                     sizeof(nciPropSetConfig_CustomField));
+              memcpy(nciPropSetConfig_CustomField, nciSetPropConfig, 9);
+              nciPropSetConfig_CustomField[8] = p_data[6];
+              nciPropSetConfig_CustomField[2] = p_data[6] + 6;
+              memcpy(nciPropSetConfig_CustomField + 9, p_data + 7, p_data[6]);
+              nciPropSetConfig_CustomField[13] = mFWInfo->chipUwbVersion >> 8;
+              nciPropSetConfig_CustomField[14] = mFWInfo->chipUwbVersion;
+
+              if (!HalSendDownstream(mHalHandle, nciPropSetConfig_CustomField,
+                                     nciPropSetConfig_CustomField[2] + 3)) {
+                STLOG_HAL_E("%s - SendDownstream failed", __func__);
+              }
+
+              mCustomParamDone = true;
+
+            } else {
+              I2cResetPulse();
+              if (mUwbConfigNeeded) {
+                mCustomParamDone = false;
+                mGetCustomerField = false;
+                hal_wrapper_set_state(HAL_WRAPPER_STATE_APPLY_UWB_PARAM);
+              }
+            }
           }
         }
 
-      } else {
-        STLOG_HAL_D("%s - Error in custom param application", __func__);
-        mCustomParamFailed = true;
-        I2cResetPulse();
-        hal_wrapper_set_state(HAL_WRAPPER_STATE_OPEN);
-      }
-      break;
+        // Check if an error has occurred for PROP_SET_CONFIG_CMD
+        // Only log a warning, do not exit code
+        if (p_data[3] != 0x00) {
+          STLOG_HAL_D("%s - Error in custom file, continue anyway", __func__);
+        }
 
-    case 0x4f:
-      if (mFWInfo->hibernate_exited == 1) {
-        if ((fread(mBinData, sizeof(uint8_t), 3, mCustomFileBin) == 3) &&
-            (fread(mBinData + 3, sizeof(uint8_t), mBinData[2],
-                   mCustomFileBin) == mBinData[2])) {
-          if (!HalSendDownstream(mHalHandle, mBinData, mBinData[2] + 3)) {
+        break;
+
+      case 0x60:  //
+        if (p_data[1] == 0x0) {
+          if (p_data[3] == 0xa0) {
+            mFWInfo->hibernate_exited = 1;
+          }
+          if (!HalSendDownstream(mHalHandle, coreInitCmd,
+                                 sizeof(coreInitCmd))) {
             STLOG_HAL_E("%s - SendDownstream failed", __func__);
           }
-        } else {
-          STLOG_HAL_D("%s - mCustomParamDone = %d", __func__, mCustomParamDone);
-          if (!mGetCustomerField) {
-            mGetCustomerField = true;
-            if (!HalSendDownstream(mHalHandle, nciGetPropConfig,
-                                   sizeof(nciGetPropConfig))) {
-              STLOG_HAL_E("%s - SendDownstream failed", __func__);
-            }
-            mGetCustomerField = true;
 
-          } else if (!mCustomParamDone) {
-            STLOG_HAL_D("%s - EOF of custom file.", __func__);
-            memset(nciPropSetConfig_CustomField, 0x0,
-                   sizeof(nciPropSetConfig_CustomField));
-            memcpy(nciPropSetConfig_CustomField, nciSetPropConfig, 9);
-            nciPropSetConfig_CustomField[8] = p_data[6];
-            nciPropSetConfig_CustomField[2] = p_data[6] + 6;
-            memcpy(nciPropSetConfig_CustomField + 9, p_data + 7, p_data[6]);
-            nciPropSetConfig_CustomField[13] = mFWInfo->chipUwbVersion >> 8;
-            nciPropSetConfig_CustomField[14] = mFWInfo->chipUwbVersion;
-
-            if (!HalSendDownstream(mHalHandle, nciPropSetConfig_CustomField,
-                                   nciPropSetConfig_CustomField[2] + 3)) {
-              STLOG_HAL_E("%s - SendDownstream failed", __func__);
-            }
-
-            mCustomParamDone = true;
-
-          } else {
-            I2cResetPulse();
-            if (mUwbConfigNeeded) {
-              mCustomParamDone = false;
-              mGetCustomerField = false;
-              hal_wrapper_set_state(HAL_WRAPPER_STATE_APPLY_UWB_PARAM);
-            }
-          }
+        } else if ((p_data[1] == 0x6) && mCustomParamDone) {
+          mCustomParamDone = false;
+          mGetCustomerField = false;
+          hal_wrapper_update_complete();
         }
-      }
-
-      // Check if an error has occurred for PROP_SET_CONFIG_CMD
-      // Only log a warning, do not exit code
-      if (p_data[3] != 0x00) {
-        STLOG_HAL_D("%s - Error in custom file, continue anyway", __func__);
-      }
-
-      break;
-
-    case 0x60:  //
-      if (p_data[1] == 0x0) {
-        if (p_data[3] == 0xa0) {
-          mFWInfo->hibernate_exited = 1;
-        }
-        if (!HalSendDownstream(mHalHandle, coreInitCmd, sizeof(coreInitCmd))) {
-          STLOG_HAL_E("%s - SendDownstream failed", __func__);
-        }
-
-      } else if ((p_data[1] == 0x6) && mCustomParamDone) {
-        mCustomParamDone = false;
-        mGetCustomerField = false;
-        hal_wrapper_update_complete();
-      }
-      break;
+        break;
+    }
   }
 }
 

@@ -18,7 +18,7 @@ cc_defaults {
         "liblog",
         "libutils",
         "libbinder_ndk",
-        "android.hardware.nfc-V1-ndk",
+        "android.hardware.nfc-V2-ndk",
         "nfc_nci.st21nfc.default",
     ],
     srcs: [
@@ -48,7 +48,7 @@ cc_binary {
         "liblog",
         "libutils",
         "libbinder_ndk",
-        "android.hardware.nfc-V1-ndk",
+        "android.hardware.nfc-V2-ndk",
         "nfc_nci.st21nfc.default",
     ],
     srcs: [

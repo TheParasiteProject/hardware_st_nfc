@@ -50,6 +50,7 @@ struct Nfc : public BnNfc {
   ::ndk::ScopedAStatus setEnableVerboseLogging(bool enable) override;
   ::ndk::ScopedAStatus isVerboseLoggingEnabled(bool* _aidl_return) override;
   binder_status_t dump(int fd, const char** args, uint32_t numArgs) override;
+  ::ndk::ScopedAStatus controlGranted(NfcStatus* _aidl_return) override;
 
   static void eventCallback(uint8_t event, uint8_t status) {
     if (mCallback != nullptr) {

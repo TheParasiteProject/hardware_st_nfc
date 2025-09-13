@@ -62,7 +62,6 @@ static pthread_t threadHandle = (pthread_t)NULL;
 pthread_mutex_t i2ctransport_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 unsigned long hal_ctrl_clk = 0;
-unsigned long hal_activerw_timer = 0;
 
 /**************************************************************************************************
  *
@@ -171,10 +170,10 @@ static void* I2cWorkerThread(void* arg) {
             }
             if (bytesRead == remaining) {
               if ((buffer[0] == 0x6f) && (buffer[1] == 0x02)) {
-                if (mDisplayFwLog) DispHal("RX DATA", buffer, 3 + bytesRead);
+                if (mDisplayFwLog) DispHal("RX DATA K2H", buffer, 3 + bytesRead);
               } else {
-                DispHal("RX DATA", buffer, 3 + bytesRead);
-              }
+                 DispHal("RX DATA K2H", buffer, 3 + bytesRead);
+                }
               HalSendUpstream(hHAL, buffer, 3 + bytesRead);
             } else {
               readOk = false;
@@ -317,8 +316,6 @@ bool I2cOpenLayer(void* dev, HAL_CALLBACK callb, HALHANDLE* pHandle) {
   }
 
   GetNumValue(NAME_STNFC_CONTROL_CLK, &hal_ctrl_clk, sizeof(hal_ctrl_clk));
-  GetNumValue(NAME_STNFC_ACTIVERW_TIMER, &hal_activerw_timer,
-              sizeof(hal_activerw_timer));
 
   if (hal_ctrl_clk) {
     if (ioctl(fidI2c, ST21NFC_CLK_DISABLE, NULL) < 0) {
@@ -476,12 +473,9 @@ static int i2cWrite(int fid, const uint8_t* pvBuffer, int length) {
   int clk_state = -1;
   char msg[LINUX_DBGBUFFER_SIZE];
 
-  if ((hal_ctrl_clk || hal_activerw_timer) && length >= 4 &&
+  if ((hal_ctrl_clk) && length >= 4 &&
       pvBuffer[0] == 0x20 && pvBuffer[1] == 0x09) {
-    if (hal_activerw_timer && (pvBuffer[3] == 0x01 || pvBuffer[3] == 0x03)) {
-      // screen off cases
-      hal_wrapper_set_state(HAL_WRAPPER_STATE_SET_ACTIVERW_TIMER);
-    }
+
     if (hal_ctrl_clk && 0 > (clk_state = ioctl(fid, ST21NFC_CLK_STATE, NULL))) {
       strerror_r(errno, msg, LINUX_DBGBUFFER_SIZE);
       STLOG_HAL_E("ST21NFC_CLK_STATE failed errno %d(%s)", errno, msg);
