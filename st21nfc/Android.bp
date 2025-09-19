@@ -25,35 +25,8 @@ cc_library_shared {
     defaults: ["hidl_defaults"],
     proprietary: true,
 
-    export_include_dirs: [
-        "include",
-        "gki/ulinux",
-        "hal",
-    ],
-
-    whole_static_libs: [
-        "nfc_nci.st21nfc.st.static",
-    ],
-
-    shared_libs: [
-        "libbase",
-        "libcutils",
-        "libhardware",
-        "libhardware_legacy",
-        "libhidlbase",
-        "liblog",
-        "libutils",
-    ],
-}
-
-cc_library_static {
-    name: "nfc_nci.st21nfc.st.static",
-    defaults: ["hidl_defaults"],
-    proprietary: true,
-
     cflags: [
         "-DST21NFC",
-        "-DST21NFC_DTA",
         "-Wall",
         "-Werror",
         "-Wextra",
@@ -65,11 +38,13 @@ cc_library_static {
         "adaptation/i2clayer.cc",
         "hal/halcore.cc",
         "hal_wrapper.cc",
+        "hal/hal_fwlog.cc",
         "hal/hal_fd.cc",
         "hal/hal_event_logger.cc",
     ],
 
     local_include_dirs: [
+        "gki/common",
         "gki/ulinux",
         "hal",
         "include",
@@ -79,11 +54,6 @@ cc_library_static {
         "include",
         "gki/ulinux",
     ],
-
-    whole_static_libs: [
-        "libstpropnci-vendor",
-    ],
-
     shared_libs: [
         "libbase",
         "libcutils",
