@@ -52,7 +52,7 @@ extern bool I2cOpenLayer(void* dev, HAL_CALLBACK callb, HALHANDLE* pHandle);
 
 typedef int (*STEseReset)(void);
 
-const char* halVersion = "ST21NFC AIDL Version 2.0.0";
+const char* halVersion = "ST21NFC AIDL Version 1.0.0";
 
 uint8_t cmd_set_nfc_mode_enable[] = {0x2f, 0x02, 0x02, 0x02, 0x01};
 uint8_t hal_is_closed = 1;
@@ -678,7 +678,6 @@ void StNfc_hal_getConfig(NfcConfig& config) {
     config.nfaProprietaryCfg.discoveryPollKovio = (uint8_t)buffer[6];
     config.nfaProprietaryCfg.discoveryPollBPrime = (uint8_t)buffer[7];
     config.nfaProprietaryCfg.discoveryListenBPrime = (uint8_t)buffer[8];
-    config.nfaProprietaryCfg.protocolChineseId = (uint8_t)buffer[9];
   } else {
     memset(&config.nfaProprietaryCfg, 0xFF, sizeof(ProtocolDiscoveryConfig));
   }
@@ -710,18 +709,6 @@ void StNfc_hal_getConfig(NfcConfig& config) {
 
   if (GetNumValue(NAME_DEFAULT_ISODEP_ROUTE, &num, sizeof(num))) {
     config.defaultIsoDepRoute = num;
-  }
-
-  if (GetByteArrayValue(NAME_OFF_HOST_SIM_PIPE_IDS, (char*)buffer.data(),
-                        buffer.size(), &retlen)) {
-    config.offHostSimPipeIds.resize(retlen);
-    for (int i = 0; i < retlen; i++) {
-      config.offHostSimPipeIds[i] = buffer[i];
-    }
-  }
-
-  if (GetNumValue(NAME_T4T_NFCEE_ENABLE, &num, sizeof(num))) {
-    config.t4tNfceeEnable = num;
   }
 }
 
