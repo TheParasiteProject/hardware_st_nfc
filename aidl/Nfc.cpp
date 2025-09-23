@@ -185,11 +185,6 @@ void OnDeath(void* cookie) {
   return ndk::ScopedAStatus::ok();
 }
 
-::ndk::ScopedAStatus Nfc::controlGranted(NfcStatus* _aidl_return) {
-  LOG(INFO) << "controlGranted";
-  return ndk::ScopedAStatus::ok();
-}
-
 binder_status_t Nfc::dump(int fd, const char**, uint32_t) {
   StNfc_hal_dump(fd);
   return STATUS_OK;

@@ -21,8 +21,6 @@
 #include <pthread.h>
 #include <stdio.h>
 
-#include <string>
-
 void DispHal(const char* title, const void* data, size_t length);
 unsigned char hal_trace_level = STNFC_TRACE_LEVEL_DEBUG;
 unsigned char hal_conf_trace_level = STNFC_TRACE_LEVEL_DEBUG;
@@ -80,29 +78,6 @@ void DispHal(const char* title, const void* data, size_t length) {
   bool first_line = true;
   bool privacy = false;
   uint16_t frame_nb;
-  char hal_prefix[4] = {0};
-
-  if ((title[0] == 'R' || title[0] == 'T') && title[7] == ' ') {
-    if (title[8] == 'S' && title[10] == 'H') {
-      // Stack to Hal : upper layer
-      memcpy(hal_prefix, " UL", 4);
-    } else if (title[8] == 'H' && title[10] == 'S') {
-      // Hal to Stack : upper layer
-      memcpy(hal_prefix, " UL", 4);
-    } else if (title[8] == 'K' && title[10] == 'H') {
-      // Kernel to Hal : lower layer
-      memcpy(hal_prefix, " LL", 4);
-    } else if (title[8] == 'H' && title[10] == 'K') {
-      // Hal to Kernel : lower layer
-      memcpy(hal_prefix, " LL", 4);
-    } else if (title[8] == 'R' && title[10] == 'H') {
-      // Replay to Hal : lower layer
-      memcpy(hal_prefix, " LL", 4);
-    } else if (title[8] == 'H' && title[10] == 'R') {
-      // Hal to Replay : lower layer
-      memcpy(hal_prefix, " LL", 4);
-    }
-  }
 
   pthread_mutex_lock(&halLogMutex);
   frame_nb = hal_log_cnt;
@@ -138,18 +113,18 @@ void DispHal(const char* title, const void* data, size_t length) {
       if (first_line == true) {
         first_line = false;
         if (title[0] == 'R') {
-          STLOG_HAL_D("(#0%04X)%s Rx %s\n", frame_nb, hal_prefix, line);
+          STLOG_HAL_D("(#0%04X) Rx %s\n", frame_nb, line);
         } else if (title[0] == 'T') {
-          STLOG_HAL_D("(#0%04X)%s Tx %s\n", frame_nb, hal_prefix, line);
+          STLOG_HAL_D("(#0%04X) Tx %s\n", frame_nb, line);
         } else {
           STLOG_HAL_D("%s\n", line);
         }
         pthread_mutex_unlock(&halLogMutex);
       } else {
         if (title[0] == 'R') {
-          STLOG_HAL_D("(#0%04X)%s rx %s\n", frame_nb, hal_prefix, line);
+          STLOG_HAL_D("(#0%04X) rx %s\n", frame_nb, line);
         } else if (title[0] == 'T') {
-          STLOG_HAL_D("(#0%04X)%s tx %s\n", frame_nb, hal_prefix, line);
+          STLOG_HAL_D("(#0%04X) tx %s\n", frame_nb, line);
         } else {
           STLOG_HAL_D("%s\n", line);
         }
@@ -167,18 +142,18 @@ void DispHal(const char* title, const void* data, size_t length) {
 
   if (first_line == true) {
     if (title[0] == 'R') {
-      STLOG_HAL_D("(#0%04X)%s Rx %s\n", frame_nb, hal_prefix, line);
+      STLOG_HAL_D("(#0%04X) Rx %s\n", frame_nb, line);
     } else if (title[0] == 'T') {
-      STLOG_HAL_D("(#0%04X)%s Tx %s\n", frame_nb, hal_prefix, line);
+      STLOG_HAL_D("(#0%04X) Tx %s\n", frame_nb, line);
     } else {
       STLOG_HAL_D("%s\n", line);
     }
     pthread_mutex_unlock(&halLogMutex);
   } else {
     if (title[0] == 'R') {
-      STLOG_HAL_D("(#0%04X)%s rx %s\n", frame_nb, hal_prefix, line);
+      STLOG_HAL_D("(#0%04X) rx %s\n", frame_nb, line);
     } else if (title[0] == 'T') {
-      STLOG_HAL_D("(#0%04X)%s tx %s\n", frame_nb, hal_prefix, line);
+      STLOG_HAL_D("(#0%04X) tx %s\n", frame_nb, line);
     } else {
       STLOG_HAL_D("%s\n", line);
     }
